@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌱 Plants vs Face Zombies!</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Fredoka+One&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 40%, #4a7c2f 40%, #4a7c2f 60%, #2d5a1b 60%);
+    font-family: 'Fredoka One', cursive;
+    overflow: hidden;
+    height: 100vh;
+    user-select: none;
+  }
+
+  #game-container {
+    position: relative;
+    width: 900px;
+    height: 560px;
+    margin: 20px auto;
+    overflow: hidden;
+    border: 4px solid #2d5a1b;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  }
+
+  /* Background layers */
+  #bg {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      #c8e6c9 0%, #a5d6a7 30%,
+      #81c784 30%, #66bb6a 55%,
+      #558b2f 55%, #33691e 100%);
+  }
+
+  /* Grid lanes */
+  .lane {
+    position: absolute;
+    left: 160px; right: 0;
+    height: 80px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .lane:nth-child(odd) { background: rgba(255,255,255,0.05); }
+
+  /* Sun counter */
+  #hud {
+    position: absolute;
+    top: 8px; left: 165px;
+    display: flex; gap: 10px; align-items: center;
+    z-index: 100;
+  }
+  #sun-display {
+    background: #FFD700;
+    border: 3px solid #FFA000;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 20px;
+    color: #5D4037;
+    font-family: 'Fredoka One';
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  }
+  #score-display {
+    background: rgba(0,0,0,0.6);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 18px;
+    color: #fff;
+  }
+  #wave-display {
+    background: #e74c3c;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 18px;
+    color: #fff;
+  }
+
+  /* Plant selection panel */
+  #plant-panel {
+    position: absolute;
+    top: 0; left: 0;
+    width: 155px; height: 100%;
+    background: linear-gradient(180deg, #4CAF50, #2E7D32);
+    border-right: 3px solid #1B5E20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 8px;
+    gap: 6px;
+    z-index: 50;
+  }
+  #panel-title {
+    color: #fff;
+    font-size: 13px;
+    text-align: center;
+    text-shadow: 1px 1px 2px #000;
+  }
+  .plant-btn {
+    width: 130px; height: 55px;
+    border: 3px solid #1B5E20;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px;
+    background: #388E3C;
+    color: #fff;
+    font-family: 'Fredoka One';
+    font-size: 13px;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .plant-btn:hover { background: #43A047; transform: scale(1.04); }
+  .plant-btn.selected { border-color: #FFD700; background: #2E7D32; box-shadow: 0 0 10px #FFD700; }
+  .plant-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+  .plant-icon { font-size: 26px; }
+  .plant-cost { font-size: 11px; color: #FFD700; }
+
+  /* Game grid */
+  #game-grid {
+    position: absolute;
+    top: 50px; left: 160px; right: 0;
+    bottom: 0;
+  }
+  .cell {
+    position: absolute;
+    width: 70px; height: 80px;
+    cursor: crosshair;
+    transition: background 0.1s;
+  }
+  .cell:hover { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+  /* Plants */
+  .plant {
+    position: absolute;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .plant-body { font-size: 40px; line-height: 1; }
+  .plant-hp-bar {
+    width: 45px; height: 5px;
+    background: #f00;
+    border-radius: 3px;
+    margin-top: 2px;
+  }
+  .plant-hp-inner {
+    height: 100%; background: #0f0;
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+
+  /* Projectiles */
+  .projectile {
+    position: absolute;
+    z-index: 30;
+    pointer-events: none;
+    border-radius: 50%;
+  }
+  .pea { width: 14px; height: 14px; background: radial-gradient(circle at 40% 35%, #90EE90, #228B22); box-shadow: 0 0 4px #0f0; }
+  .fireball { width: 16px; height: 16px; background: radial-gradient(circle at 40% 35%, #FFD700, #FF4500); box-shadow: 0 0 6px #f50; }
+  .snowball { width: 14px; height: 14px; background: radial-gradient(circle at 40% 35%, #fff, #87CEFA); box-shadow: 0 0 4px #0af; }
+
+  /* Zombies */
+  .zombie {
+    position: absolute;
+    z-index: 25;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end;
+    cursor: pointer;
+  }
+  .zombie-face-container {
+    position: relative;
+    width: 54px; height: 60px;
+  }
+  .zombie-face {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    border-radius: 50% 50% 45% 45%;
+    filter: grayscale(60%) saturate(0.7) hue-rotate(90deg) brightness(0.8);
+    border: 2px solid #2d5a1b;
+  }
+  .zombie-eyes-overlay {
+    position: absolute;
+    top: 20%; left: 15%;
+    width: 70%; height: 30%;
+    background: radial-gradient(ellipse at 30% 50%, #ff0000 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 50%, #ff0000 0%, transparent 50%);
+    mix-blend-mode: multiply;
+    opacity: 0.7;
+  }
+  .zombie-body-emoji {
+    font-size: 34px;
+    margin-top: -6px;
+    filter: grayscale(80%);
+  }
+  .zombie-hp-bar {
+    width: 50px; height: 5px;
+    background: #f00;
+    border-radius: 3px;
+    margin-top: 2px;
+  }
+  .zombie-hp-inner {
+    height: 100%; background: #f00;
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+  .zombie-label {
+    font-size: 9px; color: #90EE90;
+    text-shadow: 1px 1px 0 #000;
+    font-family: 'Fredoka One';
+  }
+  .zombie.frozen .zombie-face { filter: grayscale(30%) hue-rotate(180deg) brightness(0.9) saturate(1.5); }
+
+  /* Falling sun */
+  .sun-drop {
+    position: absolute;
+    font-size: 30px;
+    cursor: pointer;
+    z-index: 60;
+    animation: sunFall 5s linear forwards;
+    filter: drop-shadow(0 0 6px #FFD700);
+    transition: transform 0.1s;
+  }
+  .sun-drop:hover { transform: scale(1.3); }
+  @keyframes sunFall {
+    0% { top: -40px; opacity: 1; }
+    80% { opacity: 1; }
+    100% { top: 420px; opacity: 0; }
+  }
+
+  /* Explosion */
+  .explosion {
+    position: absolute;
+    font-size: 40px;
+    z-index: 40;
+    pointer-events: none;
+    animation: explode 0.5s ease-out forwards;
+  }
+  @keyframes explode {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+
+  /* Lawn mower */
+  .mower {
+    position: absolute;
+    font-size: 28px;
+    z-index: 22;
+    left: 0px;
+  }
+
+  /* UI overlays */
+  #start-screen, #gameover-screen, #win-screen {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 200;
+    color: #fff;
+  }
+  #start-screen h1 { font-family: 'Creepster', cursive; font-size: 48px; color: #90EE90; text-shadow: 0 0 20px #0f0, 3px 3px 0 #000; margin-bottom: 10px; }
+  #gameover-screen h1 { font-family: 'Creepster', cursive; font-size: 52px; color: #f00; text-shadow: 0 0 20px #f00; }
+  #win-screen h1 { font-family: 'Creepster', cursive; font-size: 52px; color: #FFD700; text-shadow: 0 0 20px #FFD700; }
+  .big-btn {
+    margin-top: 20px;
+    padding: 12px 40px;
+    font-family: 'Fredoka One'; font-size: 22px;
+    background: #4CAF50; color: #fff;
+    border: none; border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #2E7D32;
+    transition: all 0.15s;
+  }
+  .big-btn:hover { background: #66BB6A; transform: translateY(-2px); }
+  .big-btn:active { transform: translateY(2px); box-shadow: 0 3px 0 #2E7D32; }
+  .subtitle { font-size: 16px; color: #aaa; margin-top: 8px; text-align: center; }
+
+  /* Selected plant cursor indicator */
+  #cursor-plant { position: absolute; pointer-events: none; z-index: 100; font-size: 36px; transform: translate(-50%, -80%); display: none; }
+
+  /* Shovel btn */
+  #shovel-btn {
+    width: 130px; height: 40px;
+    border: 3px solid #795548;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: #8D6E63;
+    color: #fff;
+    font-family: 'Fredoka One'; font-size: 14px;
+  }
+  #shovel-btn:hover { background: #A1887F; }
+  #shovel-btn.selected { border-color: #FFD700; box-shadow: 0 0 10px #FFD700; }
+
+  /* Wave notification */
+  #wave-notif {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Creepster', cursive;
+    font-size: 56px;
+    color: #f00;
+    text-shadow: 3px 3px 0 #000, 0 0 30px #f00;
+    z-index: 150;
+    pointer-events: none;
+    display: none;
+    animation: waveIn 2s ease-out forwards;
+  }
+  @keyframes waveIn {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    70% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  /* Damage flash */
+  @keyframes damageFlash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .hit { animation: damageFlash 0.2s ease; }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  <div id="bg"></div>
+
+  <!-- Grid lanes -->
+  <div class="lane" style="top:50px"></div>
+  <div class="lane" style="top:130px"></div>
+  <div class="lane" style="top:210px"></div>
+  <div class="lane" style="top:290px"></div>
+  <div class="lane" style="top:370px"></div>
+
+  <!-- Plant panel -->
+  <div id="plant-panel">
+    <div id="panel-title">☀️ Chọn cây</div>
+    <div class="plant-btn" id="btn-sunflower" onclick="selectPlant('sunflower')">
+      <span class="plant-icon">🌻</span>
+      <div><div>Hướng Dương</div><div class="plant-cost">☀️ 50</div></div>
+    </div>
+    <div class="plant-btn" id="btn-peashooter" onclick="selectPlant('peashooter')">
+      <span class="plant-icon">🫛</span>
+      <div><div>Bắn Đậu</div><div class="plant-cost">☀️ 100</div></div>
+    </div>
+    <div class="plant-btn" id="btn-repeater" onclick="selectPlant('repeater')">
+      <span class="plant-icon">🌿</span>
+      <div><div>Bắn Đôi</div><div class="plant-cost">☀️ 200</div></div>
+    </div>
+    <div class="plant-btn" id="btn-wallnut" onclick="selectPlant('wallnut')">
+      <span class="plant-icon">🥜</span>
+      <div><div>Quả Óc Chó</div><div class="plant-cost">☀️ 50</div></div>
+    </div>
+    <div class="plant-btn" id="btn-iceshooter" onclick="selectPlant('iceshooter')">
+      <span class="plant-icon">❄️</span>
+      <div><div>Đóng Băng</div><div class="plant-cost">☀️ 175</div></div>
+    </div>
+    <div class="plant-btn" id="btn-cherry" onclick="selectPlant('cherry')">
+      <span class="plant-icon">🍒</span>
+      <div><div>Bom Cherry</div><div class="plant-cost">☀️ 150</div></div>
+    </div>
+    <div id="shovel-btn" onclick="selectShovel()">🪣 Xẻng</div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="sun-display">☀️ <span id="sun-count">150</span></div>
+    <div id="score-display">🏆 <span id="score-count">0</span></div>
+    <div id="wave-display"><img src="https://tet-dit.vercel.app/assets/face.png" style="width:40px;height:40px;"> Wave <span id="wave-num">1</span></div>
+  </div>
+
+  <!-- Game grid -->
+  <div id="game-grid"></div>
+
+  <!-- Wave notification -->
+  <div id="wave-notif"><img src="https://tet-dit.vercel.app/assets/face.png" style="width:40px;height:40px;"> WAVE!</div>
+
+  <!-- Cursor indicator -->
+  <div id="cursor-plant"></div>
+
+  <!-- Start screen -->
+  <div id="start-screen">
+    <h1>🌱 PLANTS vs<br>FACE ZOMBIES! <img src="https://tet-dit.vercel.app/assets/face.png" style="width:40px;height:40px;"></h1>
+    <p class="subtitle">Bảo vệ nhà bạn khỏi những zombie mặt người thật!<br>Click ô để trồng cây • Click mặt trời để nhặt ☀️</p>
+    <button class="big-btn" onclick="startGame()">▶ BẮT ĐẦU CHƠI</button>
+  </div>
+
+  <!-- Game over -->
+  <div id="gameover-screen" style="display:none">
+    <h1><img src="https://tet-dit.vercel.app/assets/face.png" style="width:40px;height:40px;"> GAME OVER! <img src="https://tet-dit.vercel.app/assets/face.png" style="width:40px;height:40px;"></h1>
+    <p class="subtitle">Zombie đã chiếm nhà bạn rồi!</p>
+    <p style="font-size:18px;margin-top:10px">Điểm: <span id="final-score">0</span></p>
+    <button class="big-btn" onclick="restartGame()">🔄 CHƠI LẠI</button>
+  </div>
+
+  <!-- Win screen -->
+  <div id="win-screen" style="display:none">
+    <h1>🏆 CHIẾN THẮNG! 🏆</h1>
+    <p class="subtitle">Bạn đã đánh bại tất cả zombie!</p>
+    <p style="font-size:18px;margin-top:10px">Điểm: <span id="win-score">0</span></p>
+    <button class="big-btn" onclick="restartGame()">🔄 CHƠI LẠI</button>
+  </div>
+</div>
+
+<script>
+// ======== EMBED FACES ========
+const FACE_IMAGES = [
+  'https://tet-dit.vercel.app/assets/face.png',];
+
+// ======== GAME STATE ========
+const COLS = 9, ROWS = 5;
+const CELL_W = 82, CELL_H = 80;
+const GRID_TOP = 50;
+
+let state = {
+  sun: 150, score: 0, wave: 1,
+  selectedPlant: null, shovelMode: false,
+  plants: {}, zombies: [], projectiles: [],
+  sunDrops: [], mowers: [],
+  gameRunning: false, gameOver: false,
+  waveTimer: 0, totalWaves: 5,
+  zombiesSpawnedThisWave: 0, zombiesPerWave: 8,
+  lastFrameTime: 0
+};
+
+const PLANT_DEFS = {
+  sunflower: { emoji: '🌻', cost: 50, hp: 300, maxHp: 300, damage: 0, range: 0, cooldown: 120, type: 'sun', sunAmount: 25 },
+  peashooter: { emoji: '🫛', cost: 100, hp: 300, maxHp: 300, damage: 20, range: 700, cooldown: 60, type: 'shoot', projType: 'pea', projSpeed: 5 },
+  repeater:   { emoji: '🌿', cost: 200, hp: 300, maxHp: 300, damage: 20, range: 700, cooldown: 30, type: 'shoot', projType: 'pea', projSpeed: 5 },
+  wallnut:    { emoji: '🥜', cost: 50,  hp: 1500, maxHp: 1500, damage: 0, range: 0, cooldown: 0, type: 'block' },
+  iceshooter: { emoji: '❄️', cost: 175, hp: 300, maxHp: 300, damage: 10, range: 700, cooldown: 80, type: 'shoot', projType: 'snowball', projSpeed: 4, freeze: true },
+  cherry:     { emoji: '🍒', cost: 150, hp: 100, maxHp: 100, damage: 0, range: 0, cooldown: 0, type: 'bomb', blastRadius: 140, blastDmg: 1200 }
+};
+
+const ZOMBIE_TYPES = [
+  { name: 'Normal', hp: 180, speed: 0.4, damage: 30, reward: 10 },
+  { name: 'Nhanh',  hp: 100, speed: 0.9, damage: 20, reward: 15 },
+  { name: 'To',     hp: 600, speed: 0.2, damage: 60, reward: 25 },
+  { name: 'Boss',   hp: 1400,speed: 0.25,damage: 80, reward: 50 }
+];
+
+// ======== SETUP GRID ========
+function setupGrid() {
+  const grid = document.getElementById('game-grid');
+  grid.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.style.left = (c * CELL_W) + 'px';
+      cell.style.top = (r * CELL_H) + 'px';
+      cell.style.width = CELL_W + 'px';
+      cell.style.height = CELL_H + 'px';
+      cell.dataset.row = r; cell.dataset.col = c;
+      cell.addEventListener('click', onCellClick);
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function setupMowers() {
+  state.mowers = [];
+  const container = document.getElementById('game-container');
+  document.querySelectorAll('.mower').forEach(m => m.remove());
+  for (let r = 0; r < ROWS; r++) {
+    const mower = document.createElement('div');
+    mower.className = 'mower';
+    mower.style.top = (GRID_TOP + r * CELL_H + 20) + 'px';
+    mower.style.left = '165px';
+    mower.textContent = '🚜';
+    mower.style.position = 'absolute';
+    container.appendChild(mower);
+    state.mowers.push({ row: r, x: 165, active: false, triggered: true, el: mower });
+  }
+}
+
+// ======== SELECT PLANT ========
+function selectPlant(type) {
+  state.shovelMode = false;
+  document.getElementById('shovel-btn').classList.remove('selected');
+  document.querySelectorAll('.plant-btn').forEach(b => b.classList.remove('selected'));
+  if (state.selectedPlant === type) {
+    state.selectedPlant = null;
+    document.getElementById('cursor-plant').style.display = 'none';
+    return;
+  }
+  if (state.sun < PLANT_DEFS[type].cost) return;
+  state.selectedPlant = type;
+  document.getElementById('btn-' + type).classList.add('selected');
+  const cp = document.getElementById('cursor-plant');
+  cp.textContent = PLANT_DEFS[type].emoji;
+  cp.style.display = 'block';
+}
+
+function selectShovel() {
+  state.selectedPlant = null;
+  document.querySelectorAll('.plant-btn').forEach(b => b.classList.remove('selected'));
+  state.shovelMode = !state.shovelMode;
+  document.getElementById('shovel-btn').classList.toggle('selected', state.shovelMode);
+  document.getElementById('cursor-plant').style.display = state.shovelMode ? 'block' : 'none';
+  if (state.shovelMode) document.getElementById('cursor-plant').textContent = '🪣';
+}
+
+document.addEventListener('mousemove', e => {
+  const cp = document.getElementById('cursor-plant');
+  if (cp.style.display !== 'none') {
+    const rect = document.getElementById('game-container').getBoundingClientRect();
+    cp.style.left = (e.clientX - rect.left) + 'px';
+    cp.style.top = (e.clientY - rect.top) + 'px';
+  }
+});
+
+// ======== PLACE PLANT ========
+function onCellClick(e) {
+  if (!state.gameRunning) return;
+  const r = +e.currentTarget.dataset.row;
+  const c = +e.currentTarget.dataset.col;
+  const key = r + '_' + c;
+
+  if (state.shovelMode) {
+    if (state.plants[key]) removePlant(key);
+    return;
+  }
+  if (!state.selectedPlant) return;
+  if (state.plants[key]) return;
+
+  const def = PLANT_DEFS[state.selectedPlant];
+  if (state.sun < def.cost) { flashSun(); return; }
+
+  state.sun -= def.cost;
+  updateHUD();
+
+  const plant = {
+    plantType: state.selectedPlant,
+    row: r, col: c,
+    hp: def.hp, maxHp: def.maxHp,
+    timer: def.type === 'sun' ? 80 : 0,
+    key
+  };
+
+  // Cherry bomb instant explode
+  if (def.type === 'bomb') {
+    spawnExplosion(r, c);
+    explodeBomb(r, c, def.blastRadius, def.blastDmg);
+    state.selectedPlant = null;
+    document.querySelectorAll('.plant-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('cursor-plant').style.display = 'none';
+    updateButtonStates();
+    return;
+  }
+
+  state.plants[key] = plant;
+  renderPlant(plant);
+
+  state.selectedPlant = null;
+  document.querySelectorAll('.plant-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('cursor-plant').style.display = 'none';
+  updateButtonStates();
+}
+
+function removePlant(key) {
+  const p = state.plants[key];
+  if (p && p.el) p.el.remove();
+  delete state.plants[key];
+}
+
+function renderPlant(plant) {
+  const container = document.getElementById('game-container');
+  const el = document.createElement('div');
+  el.className = 'plant';
+  el.style.left = (160 + plant.col * CELL_W + 12) + 'px';
+  el.style.top = (GRID_TOP + plant.row * CELL_H) + 'px';
+  el.style.width = CELL_W - 12 + 'px';
+  el.style.height = CELL_H + 'px';
+  el.innerHTML = `
+    <div class="plant-body">${PLANT_DEFS[plant.plantType].emoji}</div>
+    <div class="plant-hp-bar"><div class="plant-hp-inner" style="width:100%"></div></div>
+  `;
+  container.appendChild(el);
+  plant.el = el;
+}
+
+// ======== SPAWN ZOMBIE ========
+function spawnZombie() {
+  const row = Math.floor(Math.random() * ROWS);
+  let typeIdx = 0;
+  const r = Math.random();
+  const w = state.wave;
+  if (w >= 4 && r < 0.15) typeIdx = 3;
+  else if (w >= 3 && r < 0.25) typeIdx = 2;
+  else if (w >= 2 && r < 0.4)  typeIdx = 1;
+
+  const def = ZOMBIE_TYPES[typeIdx];
+  const faceIdx = Math.floor(Math.random() * FACE_IMAGES.length);
+  const id = 'z' + Date.now() + Math.random();
+
+  const zombie = {
+    id, row, typeIdx,
+    x: 905,
+    hp: def.hp * (1 + (state.wave - 1) * 0.3),
+    maxHp: def.hp * (1 + (state.wave - 1) * 0.3),
+    speed: def.speed, damage: def.damage,
+    reward: def.reward, name: def.name,
+    faceIdx, frozen: 0, attackTimer: 0
+  };
+
+  const container = document.getElementById('game-container');
+  const el = document.createElement('div');
+  el.className = 'zombie';
+  el.id = id;
+  el.style.top = (GRID_TOP + row * CELL_H + 4) + 'px';
+  el.style.left = zombie.x + 'px';
+  el.innerHTML = `
+    <div class="zombie-face-container">
+      <img class="zombie-face" src="${FACE_IMAGES[faceIdx]}" alt="zombie">
+      <div class="zombie-eyes-overlay"></div>
+    </div>
+    <div class="zombie-hp-bar"><div class="zombie-hp-inner" style="width:100%"></div></div>
+    <div class="zombie-label">${def.name}</div>
+  `;
+  container.appendChild(el);
+  zombie.el = el;
+  state.zombies.push(zombie);
+}
+
+// ======== PROJECTILE ========
+function spawnProjectile(plant) {
+  const projDef = PLANT_DEFS[plant.plantType];
+  if (!projDef) return;
+  const proj = {
+    id: 'p' + Date.now() + Math.random(),
+    row: plant.row,
+    x: 160 + plant.col * CELL_W + CELL_W,
+    y: GRID_TOP + plant.row * CELL_H + 20,
+    speed: projDef.projSpeed,
+    damage: projDef.damage,
+    type: projDef.projType,
+    freeze: projDef.freeze || false
+  };
+  const el = document.createElement('div');
+  el.className = 'projectile ' + proj.type;
+  el.id = proj.id;
+  el.style.left = proj.x + 'px';
+  el.style.top = proj.y + 'px';
+  document.getElementById('game-container').appendChild(el);
+  proj.el = el;
+  state.projectiles.push(proj);
+}
+
+// ======== SUN DROP ========
+function spawnSunDrop() {
+  const x = 165 + Math.random() * 700;
+  const el = document.createElement('div');
+  el.className = 'sun-drop';
+  el.style.left = x + 'px';
+  el.textContent = '☀️';
+  const id = 'sun' + Date.now();
+  el.id = id;
+  el.onclick = () => collectSun(id);
+  document.getElementById('game-container').appendChild(el);
+  state.sunDrops.push({ id, el, timer: 300 });
+}
+
+function collectSun(id) {
+  const idx = state.sunDrops.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  state.sun += 25;
+  state.sunDrops[idx].el.remove();
+  state.sunDrops.splice(idx, 1);
+  updateHUD();
+  updateButtonStates();
+}
+
+// ======== BOMB ========
+function explodeBomb(row, col, radius, dmg) {
+  const cx = 160 + col * CELL_W + CELL_W / 2;
+  const cy = GRID_TOP + row * CELL_H + CELL_H / 2;
+  state.zombies.forEach(z => {
+    const zx = z.x + 25;
+    const zy = GRID_TOP + z.row * CELL_H + CELL_H / 2;
+    const dist = Math.hypot(zx - cx, zy - cy);
+    if (dist < radius) damageZombie(z, dmg);
+  });
+}
+
+function spawnExplosion(row, col) {
+  const el = document.createElement('div');
+  el.className = 'explosion';
+  el.textContent = '💥';
+  el.style.left = (160 + col * CELL_W + 10) + 'px';
+  el.style.top = (GRID_TOP + row * CELL_H + 10) + 'px';
+  document.getElementById('game-container').appendChild(el);
+  setTimeout(() => el.remove(), 500);
+}
+
+// ======== DAMAGE ========
+function damageZombie(zombie, dmg, freeze) {
+  zombie.hp -= dmg;
+  if (freeze) zombie.frozen = 180;
+  if (zombie.frozen > 0) zombie.el.classList.add('frozen');
+
+  const hpPct = Math.max(0, zombie.hp / zombie.maxHp * 100);
+  const bar = zombie.el.querySelector('.zombie-hp-inner');
+  if (bar) bar.style.width = hpPct + '%';
+  zombie.el.classList.add('hit');
+  setTimeout(() => zombie.el && zombie.el.classList.remove('hit'), 200);
+
+  if (zombie.hp <= 0) killZombie(zombie);
+}
+
+function killZombie(zombie) {
+  state.score += zombie.reward;
+  zombie.el.remove();
+  state.zombies = state.zombies.filter(z => z.id !== zombie.id);
+  updateHUD();
+}
+
+function damagePlant(plant, dmg) {
+  plant.hp -= dmg;
+  const hpPct = Math.max(0, plant.hp / plant.maxHp * 100);
+  const bar = plant.el && plant.el.querySelector('.plant-hp-inner');
+  if (bar) bar.style.width = hpPct + '%';
+  if (plant.hp <= 0) removePlant(plant.key);
+}
+
+// ======== GAME LOOP ========
+function gameLoop(ts) {
+  if (!state.gameRunning) return;
+  const dt = Math.min(ts - state.lastFrameTime, 50);
+  state.lastFrameTime = ts;
+
+  tick();
+  requestAnimationFrame(gameLoop);
+}
+
+let tickCounter = 0;
+function tick() {
+  tickCounter++;
+
+  // Sun drop from sky
+  if (tickCounter % 240 === 0) spawnSunDrop();
+
+  // Sun from sunflowers
+  Object.values(state.plants).forEach(p => {
+    if (p.plantType === 'sunflower') {
+      p.timer--;
+      if (p.timer <= 0) {
+        p.timer = 120 + Math.floor(Math.random() * 60);
+        spawnSunDropFromPlant(p);
+      }
+    }
+  });
+
+  // Plants shoot
+  Object.values(state.plants).forEach(p => {
+    const def = PLANT_DEFS[p.plantType];
+    if (!def || def.type !== 'shoot') return;
+    // Check zombie in row ahead
+    const hasZombie = state.zombies.some(z => z.row === p.row && z.x > 160 + p.col * CELL_W);
+    if (!hasZombie) return;
+    p.timer = (p.timer || 0) + 1;
+    if (p.timer >= def.cooldown) {
+      p.timer = 0;
+      spawnProjectile(p);
+      if (p.plantType === 'repeater') {
+        setTimeout(() => state.gameRunning && spawnProjectile(p), 150);
+      }
+    }
+  });
+
+  // Move projectiles
+  state.projectiles.forEach(proj => {
+    proj.x += proj.speed;
+    proj.el.style.left = proj.x + 'px';
+    // Hit zombie?
+    const hit = state.zombies.find(z => z.row === proj.row && Math.abs(z.x - proj.x) < 30);
+    if (hit) {
+      damageZombie(hit, proj.damage, proj.freeze);
+      proj.el.remove();
+      proj.dead = true;
+    }
+    if (proj.x > 920) { proj.el.remove(); proj.dead = true; }
+  });
+  state.projectiles = state.projectiles.filter(p => !p.dead);
+
+  // Move zombies
+  state.zombies.forEach(z => {
+    if (z.frozen > 0) { z.frozen--; if (z.frozen === 0) z.el.classList.remove('frozen'); }
+    const spd = z.frozen > 0 ? z.speed * 0.3 : z.speed;
+
+    // Find plant in path
+    const col = Math.floor((z.x - 160) / CELL_W);
+    const blockKey = z.row + '_' + col;
+    const blockPlant = col >= 0 && col < COLS ? state.plants[blockKey] : null;
+
+    if (blockPlant && z.x < 160 + (col + 1) * CELL_W && z.x > 160 + col * CELL_W - 10) {
+      // Attack plant
+      z.attackTimer = (z.attackTimer || 0) + 1;
+      if (z.attackTimer % 60 === 0) damagePlant(blockPlant, z.damage);
+    } else {
+      z.x -= spd;
+      z.el.style.left = z.x + 'px';
+      z.attackTimer = 0;
+    }
+
+    // Reached left edge?
+    if (z.x < 162) {
+      // Trigger mower
+      const mower = state.mowers.find(m => m.row === z.row && m.triggered);
+      if (mower) {
+        triggerMower(mower);
+      } else {
+        gameOver();
+      }
+    }
+  });
+
+  // Mowers
+  state.mowers.forEach(m => {
+    if (m.active) {
+      m.x += 8;
+      m.el.style.left = m.x + 'px';
+      state.zombies.filter(z => z.row === m.row && Math.abs(z.x - m.x) < 40).forEach(z => damageZombie(z, 9999));
+      if (m.x > 920) { m.el.remove(); m.active = false; }
+    }
+  });
+
+  // Sun drops timer
+  state.sunDrops.forEach(s => {
+    s.timer--;
+    if (s.timer <= 0) { s.el.remove(); s.dead = true; }
+  });
+  state.sunDrops = state.sunDrops.filter(s => !s.dead);
+
+  // Wave management
+  state.waveTimer++;
+  const spawnInterval = Math.max(90 - state.wave * 10, 30);
+  if (state.waveTimer % spawnInterval === 0 && state.zombiesSpawnedThisWave < state.zombiesPerWave + (state.wave - 1) * 4) {
+    spawnZombie();
+    state.zombiesSpawnedThisWave++;
+  }
+
+  if (state.zombiesSpawnedThisWave >= state.zombiesPerWave + (state.wave - 1) * 4 && state.zombies.length === 0) {
+    if (state.wave >= state.totalWaves) { winGame(); return; }
+    state.wave++;
+    state.zombiesSpawnedThisWave = 0;
+    state.waveTimer = 0;
+    state.sun += 50;
+    updateHUD();
+    showWaveNotification();
+    updateButtonStates();
+  }
+
+  updateButtonStates();
+}
+
+function triggerMower(mower) {
+  mower.triggered = false;
+  mower.active = true;
+}
+
+function spawnSunDropFromPlant(plant) {
+  const el = document.createElement('div');
+  el.className = 'sun-drop';
+  el.style.left = (160 + plant.col * CELL_W + 20) + 'px';
+  el.textContent = '☀️';
+  const id = 'sun' + Date.now() + Math.random();
+  el.id = id;
+  el.onclick = () => collectSun(id);
+  el.style.animation = 'sunFall 3s linear forwards';
+  document.getElementById('game-container').appendChild(el);
+  state.sunDrops.push({ id, el, timer: 200 });
+}
+
+// ======== HUD ========
+function updateHUD() {
+  document.getElementById('sun-count').textContent = state.sun;
+  document.getElementById('score-count').textContent = state.score;
+  document.getElementById('wave-num').textContent = state.wave;
+}
+
+function updateButtonStates() {
+  Object.entries(PLANT_DEFS).forEach(([type, def]) => {
+    const btn = document.getElementById('btn-' + type);
+    if (btn) btn.classList.toggle('disabled', state.sun < def.cost);
+  });
+}
+
+function flashSun() {
+  const el = document.getElementById('sun-display');
+  el.style.background = '#f00';
+  setTimeout(() => el.style.background = '#FFD700', 300);
+}
+
+function showWaveNotification() {
+  const el = document.getElementById('wave-notif');
+  el.textContent = `🧟 WAVE ${state.wave}!`;
+  el.style.display = 'block';
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = 'waveIn 2s ease-out forwards';
+  setTimeout(() => el.style.display = 'none', 2000);
+}
+
+// ======== GAME FLOW ========
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  state.gameRunning = true;
+  state.lastFrameTime = performance.now();
+  setupGrid();
+  setupMowers();
+  spawnSunDrop();
+  requestAnimationFrame(gameLoop);
+}
+
+function gameOver() {
+  if (state.gameOver) return;
+  state.gameOver = true;
+  state.gameRunning = false;
+  document.getElementById('final-score').textContent = state.score;
+  document.getElementById('gameover-screen').style.display = 'flex';
+}
+
+function winGame() {
+  state.gameRunning = false;
+  document.getElementById('win-score').textContent = state.score;
+  document.getElementById('win-screen').style.display = 'flex';
+}
+
+function restartGame() {
+  // Clear DOM
+  document.querySelectorAll('.plant, .zombie, .projectile, .sun-drop, .mower, .explosion').forEach(e => e.remove());
+  state = {
+    sun: 150, score: 0, wave: 1,
+    selectedPlant: null, shovelMode: false,
+    plants: {}, zombies: [], projectiles: [],
+    sunDrops: [], mowers: [],
+    gameRunning: false, gameOver: false,
+    waveTimer: 0, totalWaves: 5,
+    zombiesSpawnedThisWave: 0, zombiesPerWave: 8,
+    lastFrameTime: 0
+  };
+  tickCounter = 0;
+  document.getElementById('gameover-screen').style.display = 'none';
+  document.getElementById('win-screen').style.display = 'none';
+  document.getElementById('cursor-plant').style.display = 'none';
+  document.querySelectorAll('.plant-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('shovel-btn').classList.remove('selected');
+  updateHUD();
+  updateButtonStates();
+  startGame();
+}
+
+updateHUD();
+updateButtonStates();
+</script>
+</body>
+</html>
